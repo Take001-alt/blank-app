@@ -1,4 +1,5 @@
 import streamlit as st
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
 import json
 import pandas as pd
 from io import BytesIO
@@ -9,6 +10,7 @@ import os
 import hashlib
 import urllib.request
 import urllib.error
+from pathlib import Path
 
 # ---------------------------------------------------------
 # PAGE CONFIGURATION
@@ -21,18 +23,190 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------
-# HEADER
+# DEMO UI / BRANDING
 # ---------------------------------------------------------
 
-st.title("ATLAS v1.2 — AI Translation Quality Assurance")
-st.caption("Controlled translation and language review for MES applications, documents, and artifacts")
+APP_VERSION = "v1.3.1 Demo"
+APP_DIR = Path(__file__).resolve().parent if "__file__" in globals() else Path.cwd()
+LOGO_CANDIDATES = [
+    APP_DIR / "atlas_logo.png",
+    APP_DIR / "atlas_logo.jpg",
+    APP_DIR / "atlas_logo.jpeg",
+]
+ATLAS_LOGO = next((path for path in LOGO_CANDIDATES if path.exists()), None)
+
+st.markdown(
+    """
+    <style>
+    @keyframes atlasFadeUp {
+        from { opacity: 0; transform: translateY(8px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes atlasPulse {
+        0%, 100% { transform: scale(1); opacity: .65; }
+        50% { transform: scale(1.18); opacity: 1; }
+    }
+    @keyframes atlasGlow {
+        0%, 100% { box-shadow: 0 0 0 rgba(49, 130, 206, 0); }
+        50% { box-shadow: 0 0 22px rgba(49, 130, 206, .18); }
+    }
+
+    div[data-testid="stAppViewContainer"] .main .block-container {
+        animation: atlasFadeUp .35s ease-out;
+        padding-top: 1.35rem;
+    }
+    .atlas-brand-row {
+        display: flex;
+        align-items: center;
+        gap: .85rem;
+        margin-bottom: .2rem;
+    }
+    .atlas-logo-mark {
+        width: 48px;
+        height: 48px;
+        border-radius: 14px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        font-weight: 800;
+        border: 1px solid rgba(120,120,120,.25);
+        background: rgba(120,120,120,.06);
+        animation: atlasGlow 3.2s ease-in-out infinite;
+    }
+    .atlas-brand-title {
+        font-size: 2rem;
+        font-weight: 760;
+        line-height: 1.08;
+        letter-spacing: -.025em;
+    }
+    .atlas-brand-subtitle {
+        opacity: .72;
+        margin-top: .18rem;
+    }
+    .atlas-flow {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: .42rem;
+        margin: .85rem 0 .5rem 0;
+    }
+    .atlas-step {
+        border: 1px solid rgba(120,120,120,.22);
+        border-radius: 999px;
+        padding: .32rem .68rem;
+        font-size: .82rem;
+        font-weight: 650;
+        background: rgba(120,120,120,.045);
+    }
+    .atlas-arrow { opacity: .40; font-size: .78rem; }
+
+    .atlas-loader {
+        border: 1px solid rgba(120,120,120,.20);
+        border-radius: 14px;
+        padding: .8rem 1rem;
+        margin: .6rem 0;
+        background: rgba(120,120,120,.035);
+        animation: atlasFadeUp .25s ease-out;
+    }
+    .atlas-loader-title { font-weight: 700; margin-bottom: .35rem; }
+    .atlas-loader-dots { display: inline-flex; gap: 7px; margin-right: .55rem; }
+    .atlas-loader-dots span {
+        width: 8px; height: 8px; border-radius: 50%;
+        background: currentColor;
+        display: inline-block;
+        animation: atlasPulse 1.1s infinite ease-in-out;
+    }
+    .atlas-loader-dots span:nth-child(2) { animation-delay: .14s; }
+    .atlas-loader-dots span:nth-child(3) { animation-delay: .28s; }
+
+    div.stButton > button,
+    div.stDownloadButton > button {
+        transition: transform .14s ease, box-shadow .14s ease, border-color .14s ease;
+    }
+    div.stButton > button:hover,
+    div.stDownloadButton > button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 5px 16px rgba(0,0,0,.09);
+    }
+    div[role="radiogroup"] label {
+        transition: background-color .16s ease, transform .16s ease;
+        border-radius: 8px;
+    }
+    div[role="radiogroup"] label:hover {
+        transform: translateX(2px);
+        background: rgba(120,120,120,.06);
+    }
+    button[data-baseweb="tab"] {
+        transition: transform .16s ease, opacity .16s ease;
+    }
+    button[data-baseweb="tab"]:hover { transform: translateY(-1px); }
+    div[data-testid="stExpander"] {
+        transition: box-shadow .18s ease, transform .18s ease;
+    }
+    div[data-testid="stExpander"]:hover {
+        box-shadow: 0 4px 18px rgba(0,0,0,.045);
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+if ATLAS_LOGO:
+    h1, h2 = st.columns([0.075, 0.925], vertical_alignment="center")
+    with h1:
+        st.image(str(ATLAS_LOGO), use_container_width=True)
+    with h2:
+        st.markdown(
+            '<div class="atlas-brand-title">ATLAS — AI-Assisted MES Translation</div>'
+            '<div class="atlas-brand-subtitle">MODA-ES JSON • English → German • Human-Controlled Review</div>',
+            unsafe_allow_html=True,
+        )
+else:
+    st.markdown(
+        '<div class="atlas-brand-row">'
+        '<div class="atlas-logo-mark">A</div>'
+        '<div><div class="atlas-brand-title">ATLAS — AI-Assisted MES Translation</div>'
+        '<div class="atlas-brand-subtitle">MODA-ES JSON • English → German • Human-Controlled Review</div></div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+st.markdown(
+    '<div class="atlas-flow">'
+    '<span class="atlas-step">1 Import</span><span class="atlas-arrow">→</span>'
+    '<span class="atlas-step">2 Translate</span><span class="atlas-arrow">→</span>'
+    '<span class="atlas-step">3 Review</span><span class="atlas-arrow">→</span>'
+    '<span class="atlas-step">4 Quality Check</span><span class="atlas-arrow">→</span>'
+    '<span class="atlas-step">5 Verify</span><span class="atlas-arrow">→</span>'
+    '<span class="atlas-step">6 Export</span>'
+    '</div>',
+    unsafe_allow_html=True,
+)
+st.caption(f"{APP_VERSION} • Demo workflow — existing translation → controlled knowledge → AI assistance → human approval")
 st.divider()
+
+
+def atlas_loading_card(title, detail):
+    """Return a Streamlit placeholder showing a lightweight animated ATLAS loading card."""
+    placeholder = st.empty()
+    placeholder.markdown(
+        f"""
+        <div class="atlas-loader">
+          <div class="atlas-loader-title">
+            <span class="atlas-loader-dots"><span></span><span></span><span></span></span>
+            {title}
+          </div>
+          <div style="opacity:.70;font-size:.88rem;">{detail}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    return placeholder
 
 # ============================================================
 # TRANSLATION MEMORY / TERMINOLOGY
 # ============================================================
-
-from pathlib import Path
 
 TM_FILE = Path(__file__).with_name("atlas_v11_translation_memory.json")
 TERM_FILE = Path(__file__).with_name("atlas_v11_terminology.json")
@@ -127,6 +301,13 @@ def get_terminology():
 def set_flash_message(message, kind="success"):
     """Store a one-time UI notification that survives st.rerun()."""
     st.session_state.atlas_flash = {"message": message, "kind": kind}
+
+
+def bump_translation_grid_revision():
+    """Force the editable AgGrid to rebuild from the latest review_df state."""
+    st.session_state["translation_grid_revision"] = (
+        int(st.session_state.get("translation_grid_revision", 0)) + 1
+    )
 
 
 def show_flash_message():
@@ -254,6 +435,76 @@ def _extract_gemini_output_text(payload):
     return "\n".join(chunks).strip()
 
 
+
+class AIServiceError(RuntimeError):
+    """User-safe AI provider exception with a machine-readable category."""
+
+    def __init__(self, message, *, provider="", status_code=None, kind="service"):
+        super().__init__(message)
+        self.provider = provider
+        self.status_code = status_code
+        self.kind = kind
+
+
+def _gemini_http_error(exc, details="", *, qa=False):
+    """Convert Gemini HTTP failures into concise ATLAS-friendly exceptions."""
+    code = getattr(exc, "code", None)
+
+    if code == 429:
+        return AIServiceError(
+            "The configured Gemini project has reached its current usage limit. "
+            "Wait for the quota window to reset, use a project with available quota, "
+            "or switch AI provider. No ATLAS review decisions or source JSON values were changed.",
+            provider="Google Gemini",
+            status_code=429,
+            kind="quota",
+        )
+    if code in (401, 403):
+        return AIServiceError(
+            "Gemini authentication was not accepted. Check the API key, project access, and model permissions.",
+            provider="Google Gemini",
+            status_code=code,
+            kind="authentication",
+        )
+    if code == 404:
+        return AIServiceError(
+            "The configured Gemini model or endpoint is unavailable. Check the selected model.",
+            provider="Google Gemini",
+            status_code=code,
+            kind="configuration",
+        )
+    if code and code >= 500:
+        return AIServiceError(
+            "Gemini is temporarily unavailable. Try the request again later.",
+            provider="Google Gemini",
+            status_code=code,
+            kind="service",
+        )
+    return AIServiceError(
+        f"Gemini request could not be completed ({code or 'service error'}).",
+        provider="Google Gemini",
+        status_code=code,
+        kind="service",
+    )
+
+
+def friendly_ai_message(exc):
+    """Return short UI copy without exposing raw provider payloads."""
+    if isinstance(exc, AIServiceError):
+        if exc.kind == "quota":
+            return (
+                "AI service temporarily unavailable — the configured provider has reached "
+                "its current usage limit. Controlled terminology, manual review, approval, "
+                "integrity verification, and export remain available."
+            )
+        if exc.kind == "authentication":
+            return "AI connection could not be authenticated. Check the API key and provider access."
+        if exc.kind == "configuration":
+            return "AI provider configuration needs attention. Check the selected model and provider settings."
+        return str(exc)
+    return "The AI request could not be completed. Review the provider configuration and try again."
+
+
 def call_gemini_translation(
     source_text,
     context,
@@ -323,9 +574,13 @@ def call_gemini_translation(
             details = error_obj.get("message", details)
         except Exception:
             pass
-        raise RuntimeError(f"Gemini API error {exc.code}: {details or exc.reason}") from exc
+        raise _gemini_http_error(exc, details) from exc
     except urllib.error.URLError as exc:
-        raise RuntimeError(f"Unable to reach the Gemini API: {exc.reason}") from exc
+        raise AIServiceError(
+            "Unable to reach Gemini. Check the network connection and try again.",
+            provider="Google Gemini",
+            kind="network",
+        ) from exc
 
     translation = _extract_gemini_output_text(payload)
     if not translation:
@@ -629,9 +884,13 @@ Use "Review Required" when one or more material issues may affect correctness.
             details = parsed.get("error", {}).get("message", details)
         except Exception:
             pass
-        raise RuntimeError(f"Gemini QA API error {exc.code}: {details or exc.reason}") from exc
+        raise _gemini_http_error(exc, details, qa=True) from exc
     except urllib.error.URLError as exc:
-        raise RuntimeError(f"Unable to reach the Gemini QA API: {exc.reason}") from exc
+        raise AIServiceError(
+            "Unable to reach Gemini for the quality check. Check the network connection and try again.",
+            provider="Google Gemini",
+            kind="network",
+        ) from exc
 
     raw_text = _extract_gemini_output_text(response_payload)
     if not raw_text:
@@ -747,6 +1006,15 @@ def make_audit_excel(df):
 # ============================================================
 
 with st.sidebar:
+    if ATLAS_LOGO:
+        st.image(str(ATLAS_LOGO), width=88)
+    else:
+        st.markdown(
+            '<div style="font-size:1.35rem;font-weight:800;letter-spacing:-.02em;">ATLAS</div>'
+            '<div style="opacity:.62;font-size:.78rem;margin-bottom:.4rem;">AI-Assisted MES Translation</div>',
+            unsafe_allow_html=True,
+        )
+
     page = st.radio(
         "ATLAS Module",
         ["Translation Workspace", "Translation Memory", "Terminology Manager", "Audit Trail"],
@@ -787,6 +1055,7 @@ with st.sidebar:
                 st.session_state.pop("review_df", None)
                 st.session_state.pop("review_file_key", None)
                 st.session_state.pop("translation_editor", None)
+                bump_translation_grid_revision()
                 st.session_state["atlas_new_file_loaded"] = True
 
         except (UnicodeDecodeError, json.JSONDecodeError):
@@ -826,7 +1095,7 @@ with st.sidebar:
     else:
         st.caption("No artifact loaded for this session.")
     st.divider()
-    st.subheader("AI Translation")
+    st.subheader("AI Translation Assistance")
     ai_provider = st.selectbox(
         "AI Provider",
         AI_PROVIDERS,
@@ -880,15 +1149,31 @@ with st.sidebar:
 
     if ai_provider != "Disabled (Controlled Only)":
         if st.button("Test AI Connection", use_container_width=True):
+            loader = atlas_loading_card(
+                "Checking AI connection",
+                "ATLAS is verifying the provider, API key, and selected model.",
+            )
             try:
-                with st.spinner("Testing AI provider..."):
-                    test_ai_provider(ai_provider, ai_api_key, ai_model)
+                test_ai_provider(ai_provider, ai_api_key, ai_model)
+                st.session_state["ai_connection_state"] = "ready"
+                st.session_state["ai_connection_message"] = "AI provider is ready for translation."
                 set_flash_message("AI provider connection succeeded.", "success")
             except Exception as exc:
-                set_flash_message(f"AI provider test failed: {exc}", "error")
+                st.session_state["ai_connection_state"] = "error"
+                st.session_state["ai_connection_message"] = friendly_ai_message(exc)
+                set_flash_message(friendly_ai_message(exc), "warning")
+            finally:
+                loader.empty()
             st.rerun()
 
-    st.caption("AI suggestions always require human review and are never auto-approved.")
+        connection_state = st.session_state.get("ai_connection_state")
+        connection_message = st.session_state.get("ai_connection_message", "")
+        if connection_state == "ready":
+            st.success(f"AI Ready — {connection_message}")
+        elif connection_state == "error":
+            st.warning(connection_message)
+
+    st.caption("AI-generated suggestions require human review and are never auto-approved.")
 
 
 # Show one-time notifications after page/rerun events.
@@ -1285,7 +1570,7 @@ st.info(
     "when approved terminology fully covers the source text; otherwise the item remains Needs Review."
 )
 
-st.header("1. Current MODA-ES File")
+st.header("1. Import MODA-ES JSON")
 
 if "atlas_uploaded_json" in st.session_state:
     current_file_name = st.session_state.get("atlas_uploaded_file_name", "Loaded JSON")
@@ -1587,6 +1872,183 @@ def apply_approved_translations(original_data, review_df):
 
     return translated_data, approved_count
 
+
+# ============================================================
+# v1.3 EXPORT INTEGRITY VERIFICATION
+# ============================================================
+
+def _json_path(parts):
+    """Render a human-readable JSON path for integrity reporting."""
+    path = "$"
+    for part in parts:
+        if isinstance(part, int):
+            path += f"[{part}]"
+        else:
+            path += f".{part}"
+    return path
+
+
+def _json_differences(original, exported, parts=()):
+    """Return all structural/value differences between two JSON-compatible objects."""
+    differences = []
+
+    if type(original) is not type(exported):
+        differences.append({
+            "Path": _json_path(parts),
+            "Change": "Type changed",
+            "Original": repr(original),
+            "Exported": repr(exported),
+        })
+        return differences
+
+    if isinstance(original, dict):
+        original_keys = set(original.keys())
+        exported_keys = set(exported.keys())
+
+        for key in sorted(original_keys - exported_keys):
+            differences.append({
+                "Path": _json_path(parts + (key,)),
+                "Change": "Key removed",
+                "Original": repr(original[key]),
+                "Exported": "<missing>",
+            })
+
+        for key in sorted(exported_keys - original_keys):
+            differences.append({
+                "Path": _json_path(parts + (key,)),
+                "Change": "Key added",
+                "Original": "<missing>",
+                "Exported": repr(exported[key]),
+            })
+
+        for key in sorted(original_keys & exported_keys):
+            differences.extend(
+                _json_differences(original[key], exported[key], parts + (key,))
+            )
+        return differences
+
+    if isinstance(original, list):
+        if len(original) != len(exported):
+            differences.append({
+                "Path": _json_path(parts),
+                "Change": "List length changed",
+                "Original": str(len(original)),
+                "Exported": str(len(exported)),
+            })
+
+        for index, (original_item, exported_item) in enumerate(zip(original, exported)):
+            differences.extend(
+                _json_differences(original_item, exported_item, parts + (index,))
+            )
+        return differences
+
+    if original != exported:
+        differences.append({
+            "Path": _json_path(parts),
+            "Change": "Value changed",
+            "Original": repr(original),
+            "Exported": repr(exported),
+        })
+
+    return differences
+
+
+def allowed_translation_paths(review_df):
+    """Return JSON paths that ATLAS is permitted to change for approved review rows."""
+    allowed = set()
+
+    for _, row in review_df.iterrows():
+        if str(row.get("Status", "")) != "Approved":
+            continue
+
+        translation = str(row.get("Translation", "")).strip()
+        if not translation or translation.startswith("[TRANSLATE]"):
+            continue
+
+        try:
+            section_index = int(row["_section_index"])
+            item_type = str(row.get("_item_type", "Measurement Name"))
+
+            if item_type == "Section Label":
+                allowed.add(
+                    f"$.MeasurementData.Sections[{section_index}].Label"
+                )
+            else:
+                measurement_index = int(row["_measurement_index"])
+                allowed.add(
+                    f"$.MeasurementData.Sections[{section_index}].Measurements"
+                    f"[{measurement_index}].Name"
+                )
+        except (KeyError, TypeError, ValueError):
+            continue
+
+    return allowed
+
+
+def verify_export_integrity(original_data, exported_data, review_df):
+    """Verify that only explicitly approved translatable JSON fields changed."""
+    differences = _json_differences(original_data, exported_data)
+    allowed_paths = allowed_translation_paths(review_df)
+
+    expected_changes = []
+    unexpected_changes = []
+
+    for difference in differences:
+        if difference["Path"] in allowed_paths and difference["Change"] == "Value changed":
+            expected_changes.append(difference)
+        else:
+            unexpected_changes.append(difference)
+
+    canonical_original = json.dumps(
+        original_data, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    canonical_exported = json.dumps(
+        exported_data, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+
+    return {
+        "status": "PASS" if not unexpected_changes else "FAIL",
+        "expected_changes": expected_changes,
+        "unexpected_changes": unexpected_changes,
+        "allowed_paths": allowed_paths,
+        "source_sha256": hashlib.sha256(canonical_original).hexdigest(),
+        "output_sha256": hashlib.sha256(canonical_exported).hexdigest(),
+    }
+
+
+def make_integrity_report(integrity_result):
+    """Create a plain-text v1.3 integrity report suitable for test evidence."""
+    lines = [
+        "ATLAS v1.3 — Export Integrity Verification",
+        "",
+        f"Result: {integrity_result['status']}",
+        f"Expected translation changes: {len(integrity_result['expected_changes'])}",
+        f"Unexpected changes: {len(integrity_result['unexpected_changes'])}",
+        f"Source SHA-256: {integrity_result['source_sha256']}",
+        f"Output SHA-256: {integrity_result['output_sha256']}",
+        "",
+        "Expected changes:",
+    ]
+
+    if integrity_result["expected_changes"]:
+        for item in integrity_result["expected_changes"]:
+            lines.append(f"- {item['Path']}: {item['Original']} -> {item['Exported']}")
+    else:
+        lines.append("- None")
+
+    lines.extend(["", "Unexpected changes:"])
+    if integrity_result["unexpected_changes"]:
+        for item in integrity_result["unexpected_changes"]:
+            lines.append(
+                f"- {item['Path']} [{item['Change']}]: "
+                f"{item['Original']} -> {item['Exported']}"
+            )
+    else:
+        lines.append("- None")
+
+    return "\n".join(lines)
+
+
 def make_excel(review_df):
     export_df = review_df[
         [
@@ -1676,7 +2138,19 @@ if "atlas_uploaded_json" in st.session_state:
 
         sections = data.get("MeasurementData", {}).get("Sections", [])
 
-        st.header("2. File Information")
+        approved_now = int((review_df["Status"].astype(str) == "Approved").sum()) if not review_df.empty else 0
+        unresolved_now = int(
+            (review_df["Translation"].astype(str).str.startswith("[TRANSLATE]")
+             | (review_df["Proposal Source"].astype(str) == "Needs Human Translation")).sum()
+        ) if not review_df.empty else 0
+        ds1, ds2, ds3, ds4 = st.columns(4)
+        ds1.metric("Format", "MODA-ES JSON")
+        ds2.metric("Translatable Items", len(review_df))
+        ds3.metric("Approved", approved_now)
+        ds4.metric("Needs Attention", unresolved_now)
+        st.caption("Workflow: Import → Translate → Review → Quality Check → Verify → Export")
+
+        st.header("2. Artifact Overview")
         section_review_count = int((review_df["_item_type"] == "Section Label").sum()) if not review_df.empty else 0
         measurement_review_count = int((review_df["_item_type"] == "Measurement Name").sum()) if not review_df.empty else 0
         st.write(f"**Sections found:** {len(sections)}")
@@ -1688,7 +2162,7 @@ if "atlas_uploaded_json" in st.session_state:
         # TRANSLATION REVIEW
         # ====================================================
 
-        st.header("3. Translation Review & Approval")
+        st.header("3. Translate & Review")
         st.write(
             "Review each source item in context, compare any existing translation, and edit the proposed "
             "translation when needed. Only items explicitly marked **Approved** are written to the output artifact."
@@ -1717,7 +2191,7 @@ if "atlas_uploaded_json" in st.session_state:
             )
             unresolved_count = int(unresolved_mask.sum())
 
-            with st.expander("AI Suggestions for Unresolved Items", expanded=unresolved_count > 0):
+            with st.expander("AI Translation Assistance", expanded=unresolved_count > 0):
                 st.write(
                     "AI is used only for items that ATLAS could not resolve from the existing "
                     "artifact, exact Translation Memory, or fully controlled terminology."
@@ -1759,8 +2233,14 @@ if "atlas_uploaded_json" in st.session_state:
                         target_indices = review_df.index[unresolved_mask].tolist()[: int(ai_limit)]
                         generated_count = 0
                         failed = []
+                        quota_stopped = False
 
-                        progress = st.progress(0, text="Generating controlled AI suggestions...")
+                        ai_loader = atlas_loading_card(
+                            "ATLAS AI is translating MES content",
+                            "Applying controlled terminology, MES context, and provider assistance. "
+                            "Generated text will remain Needs Review.",
+                        )
+                        progress = st.progress(0, text="Preparing AI translation assistance...")
                         for pos, row_index in enumerate(target_indices, start=1):
                             row = review_df.loc[row_index]
                             source_text = str(row["English Source"]).strip()
@@ -1796,8 +2276,14 @@ if "atlas_uploaded_json" in st.session_state:
                                     translation_source=f"{ai_provider} ({ai_model})",
                                 )
                                 generated_count += 1
+                            except AIServiceError as exc:
+                                failed.append(f"{source_text}: {friendly_ai_message(exc)}")
+                                if exc.kind == "quota":
+                                    quota_stopped = True
+                                    st.session_state["ai_service_notice"] = friendly_ai_message(exc)
+                                    break
                             except Exception as exc:
-                                failed.append(f"{source_text}: {exc}")
+                                failed.append(f"{source_text}: {friendly_ai_message(exc)}")
 
                             progress.progress(
                                 pos / max(1, len(target_indices)),
@@ -1805,13 +2291,21 @@ if "atlas_uploaded_json" in st.session_state:
                             )
 
                         progress.empty()
+                        ai_loader.empty()
                         st.session_state.review_df = review_df
 
-                        if generated_count:
+                        if quota_stopped:
+                            set_flash_message(
+                                f"AI requests stopped safely after the provider reported a usage limit. "
+                                f"{generated_count} suggestion(s) were generated before the stop.",
+                                "warning",
+                            )
+                            st.session_state["ai_generation_errors"] = failed
+                        elif generated_count:
                             if failed:
                                 set_flash_message(
                                     f"Generated {generated_count} AI suggestion(s); "
-                                    f"{len(failed)} item(s) failed. See details in the AI panel.",
+                                    f"{len(failed)} item(s) could not be completed.",
                                     "warning",
                                 )
                                 st.session_state["ai_generation_errors"] = failed
@@ -1821,14 +2315,21 @@ if "atlas_uploaded_json" in st.session_state:
                                     "success",
                                 )
                         else:
-                            set_flash_message("No AI suggestions were generated.", "error")
+                            set_flash_message("No AI suggestions were generated.", "warning")
                             st.session_state["ai_generation_errors"] = failed
                         st.rerun()
 
+                service_notice = st.session_state.pop("ai_service_notice", None)
+                if service_notice:
+                    st.warning(service_notice)
+
                 ai_errors = st.session_state.pop("ai_generation_errors", None)
                 if ai_errors:
-                    st.error("Some AI translation requests failed.")
-                    with st.expander("Show AI errors"):
+                    st.info(
+                        "One or more AI requests could not be completed. "
+                        "Your source artifact and existing review decisions remain unchanged."
+                    )
+                    with st.expander("AI request details"):
                         for error in ai_errors:
                             st.write(f"- {error}")
 
@@ -1842,8 +2343,11 @@ if "atlas_uploaded_json" in st.session_state:
             with control1:
                 if st.button("Approve All", use_container_width=True):
                     usable_mask = ~review_df["Translation"].astype(str).str.startswith("[TRANSLATE]")
+                    rejected_mask = review_df["Status"].astype(str).eq("Rejected")
+                    approve_mask = usable_mask & ~rejected_mask
+
                     for row_pos, audit_row in review_df.iterrows():
-                        if bool(usable_mask.loc[row_pos]) and audit_row["Status"] != "Approved":
+                        if bool(approve_mask.loc[row_pos]) and audit_row["Status"] != "Approved":
                             record_audit_event(
                                 "Review Approved",
                                 english_source=audit_row["English Source"],
@@ -1851,20 +2355,33 @@ if "atlas_uploaded_json" in st.session_state:
                                 new_translation=audit_row["Translation"],
                                 review_status="Approved",
                                 source_file=current_file_name,
-                                reason="Approve All review action",
+                                reason="Approve All review action; explicitly rejected rows preserved",
                                 translation_source=audit_row.get("Proposal Source", ""),
                             )
-                    review_df.loc[usable_mask, "Status"] = "Approved"
-                    review_df.loc[~usable_mask, "Status"] = "Needs Review"
+
+                    review_df.loc[approve_mask, "Status"] = "Approved"
+                    review_df.loc[~usable_mask & ~rejected_mask, "Status"] = "Needs Review"
                     st.session_state.review_df = review_df
-                    unresolved = int((~usable_mask).sum())
-                    if unresolved:
+                    bump_translation_grid_revision()
+
+                    unresolved = int((~usable_mask & ~rejected_mask).sum())
+                    preserved_rejected = int(rejected_mask.sum())
+
+                    if unresolved or preserved_rejected:
+                        message_parts = []
+                        if unresolved:
+                            message_parts.append(f"{unresolved} unresolved item(s) remain Needs Review")
+                        if preserved_rejected:
+                            message_parts.append(f"{preserved_rejected} rejected item(s) were preserved")
                         set_flash_message(
-                            f"Approved all usable translations. {unresolved} unresolved item(s) remain Needs Review.",
+                            "Approved all eligible translations. " + "; ".join(message_parts) + ".",
                             "warning",
                         )
                     else:
-                        set_flash_message("All review items approved and recorded in the audit trail.", "success")
+                        set_flash_message(
+                            "All eligible review items approved and recorded in the audit trail.",
+                            "success",
+                        )
                     st.rerun()
 
             with control2:
@@ -1883,6 +2400,7 @@ if "atlas_uploaded_json" in st.session_state:
                             )
                     review_df["Status"] = "Rejected"
                     st.session_state.review_df = review_df
+                    bump_translation_grid_revision()
                     set_flash_message("All review items rejected and recorded in the audit trail.", "warning")
                     st.rerun()
 
@@ -1894,11 +2412,12 @@ if "atlas_uploaded_json" in st.session_state:
                         reason="Translation review reset to uploaded-file baseline",
                     )
                     st.session_state.review_df = build_review_dataframe(data)
+                    bump_translation_grid_revision()
                     set_flash_message("Translation review reset. The action was recorded in the audit trail.", "warning")
                     st.rerun()
 
             with control4:
-                st.caption("Workflow: Edit → Review → Approve/Reject")
+                st.caption("Approve All preserves rows already marked Rejected.")
 
             st.divider()
 
@@ -1908,7 +2427,14 @@ if "atlas_uploaded_json" in st.session_state:
 
             # Keep the main reviewer view concise and format-independent.
             # MODA-specific metadata remains available in the technical-details section below.
+            # Add a reviewer-facing indicator so AI-generated rows are obvious.
+            # This is display-only and does not alter the translated text or export logic.
+            review_df["AI Translation"] = review_df["Proposal Source"].astype(str).apply(
+                lambda value: "🔵 AI" if value.startswith("AI Suggested -") else ""
+            )
+
             editable_columns = [
+                "AI Translation",
                 "ID",
                 "Item Type",
                 "Section",
@@ -1919,56 +2445,105 @@ if "atlas_uploaded_json" in st.session_state:
                 "Status",
             ]
 
-            edited_df = st.data_editor(
-                review_df[editable_columns],
-                use_container_width=True,
-                height=520,
-                hide_index=True,
-                num_rows="fixed",
-                column_config={
-                    "ID": st.column_config.NumberColumn(
-                        "#",
-                        disabled=True,
-                        width="small",
-                    ),
-                    "Item Type": st.column_config.TextColumn(
-                        "Type",
-                        disabled=True,
-                        width="small",
-                        help="Identifies what kind of artifact content is being reviewed. In MODA-ES this is currently Section or Measurement; future connectors can add other artifact content types.",
-                    ),
-                    "Section": st.column_config.TextColumn(
-                        "Context",
-                        disabled=True,
-                        help="Where this text appears in the source artifact. For MODA-ES, this is the actual section label from the JSON. Section rows and measurement rows use the same context so reviewers can see where each item belongs.",
-                    ),
-                    "English Source": st.column_config.TextColumn(
-                        "Source Text",
-                        disabled=True,
-                        help="The original source-language text being reviewed for translation.",
-                    ),
-                    "Existing Translation": st.column_config.TextColumn(
-                        "Current Translation",
-                        disabled=True,
-                        help="Translation already present in the uploaded artifact, if one exists.",
-                    ),
-                    "Translation": st.column_config.TextColumn(
-                        "Translation",
-                        help="The proposed target-language translation. Reviewers can edit this value before approval.",
-                    ),
-                    "Terminology Matches": st.column_config.TextColumn(
-                        "Approved Terms Found", disabled=True,
-                        help="Controlled terminology found inside the source text. These terms guide the reviewer but do not automatically make the full translation approved.",
-                    ),
-                    "Status": st.column_config.SelectboxColumn(
-                        "Review Status",
-                        options=["Pending", "Needs Review", "Approved", "Rejected"],
-                        required=True,
-                    ),
-                },
-                key="translation_editor",
+            # AI-generated translations are highlighted across the entire editable row.
+            st.caption(
+                "🔵 **AI** = translation generated by ATLAS AI assistance. "
+                "AI-generated rows remain **Needs Review** until a human reviewer approves or edits them."
             )
 
+            # Whole-row AI highlighting requires an editable grid that supports row styling.
+            # AgGrid keeps Translation and Review Status editable while allowing AI-generated
+            # rows to be highlighted across the full width of the table.
+            grid_df = review_df[editable_columns].copy()
+
+            gb = GridOptionsBuilder.from_dataframe(grid_df)
+            gb.configure_default_column(
+                resizable=True,
+                sortable=True,
+                filter=True,
+                wrapText=True,
+                autoHeight=True,
+            )
+
+            # Read-only reviewer context columns.
+            for col_name in [
+                "AI Translation",
+                "ID",
+                "Item Type",
+                "Section",
+                "English Source",
+                "Existing Translation",
+                "Terminology Matches",
+            ]:
+                gb.configure_column(col_name, editable=False)
+
+            gb.configure_column(
+                "Translation",
+                header_name="Translation",
+                editable=True,
+                minWidth=260,
+            )
+            gb.configure_column(
+                "Status",
+                header_name="Review Status",
+                editable=True,
+                cellEditor="agSelectCellEditor",
+                cellEditorParams={
+                    "values": ["Pending", "Needs Review", "Approved", "Rejected"]
+                },
+                minWidth=145,
+            )
+            gb.configure_column("AI Translation", header_name="AI", width=85, pinned="left")
+            gb.configure_column("ID", header_name="#", width=70)
+            gb.configure_column("Item Type", header_name="Type", width=120)
+            gb.configure_column("Section", header_name="Context", minWidth=220)
+            gb.configure_column("English Source", header_name="Source Text", minWidth=260)
+            gb.configure_column("Existing Translation", header_name="Current Translation", minWidth=240)
+            gb.configure_column("Terminology Matches", header_name="Approved Terms Found", minWidth=190)
+
+            # Highlight the ENTIRE row when ATLAS AI generated the current proposal.
+            # A darker blue is used for selected rows so the row remains visibly selected.
+            ai_row_style = JsCode(
+                """
+                function(params) {
+                    const source = params.data && params.data['AI Translation'];
+                    if (source && source.indexOf('AI') !== -1) {
+                        return {
+                            'backgroundColor': 'rgba(33, 150, 243, 0.16)',
+                            'borderLeft': '4px solid #2196F3',
+                            'fontWeight': '500'
+                        };
+                    }
+                    return {};
+                }
+                """
+            )
+            gb.configure_grid_options(
+                getRowStyle=ai_row_style,
+                rowSelection="single",
+                suppressRowClickSelection=False,
+                animateRows=True,
+            )
+
+            st.caption(
+                "Rows highlighted in **blue** were generated by ATLAS AI assistance. "
+                "They still require human review before approval."
+            )
+
+            grid_response = AgGrid(
+                grid_df,
+                gridOptions=gb.build(),
+                update_mode=GridUpdateMode.VALUE_CHANGED,
+                allow_unsafe_jscode=True,
+                fit_columns_on_grid_load=False,
+                height=540,
+                theme="streamlit",
+                key=f"translation_editor_grid_{st.session_state.get('translation_grid_revision', 0)}",
+            )
+
+            edited_df = grid_response["data"].copy()
+            # Preserve expected column order/types for the existing audit/update logic below.
+            edited_df = edited_df[editable_columns]
             with st.expander("Show technical details", expanded=False):
                 st.caption(
                     "Technical metadata is kept available for developers, validators, and troubleshooting, "
@@ -2062,9 +2637,9 @@ if "atlas_uploaded_json" in st.session_state:
                         )
                         review_df.at[row_index, "QA Checked Translation"] = ""
 
-            with st.expander("AI Translation Quality Assurance", expanded=False):
+            with st.expander("Translation Quality Check", expanded=False):
                 st.write(
-                    "AI QA compares the source and current translation for meaning preservation, "
+                    "AI-assisted quality review compares the source and current translation for meaning preservation, "
                     "controlled terminology, omissions/additions, untranslated text, and ambiguity. "
                     "It is advisory only and never changes Review Status or approves content."
                 )
@@ -2134,7 +2709,13 @@ if "atlas_uploaded_json" in st.session_state:
                         selected_indices = qa_target_indices[: int(qa_limit)]
                         qa_completed = 0
                         qa_failed = []
-                        progress = st.progress(0, text="Running AI translation quality checks...")
+                        qa_quota_stopped = False
+                        qa_loader = atlas_loading_card(
+                            "ATLAS AI is checking translation quality",
+                            "Reviewing meaning preservation, terminology, omissions/additions, "
+                            "untranslated text, and ambiguity.",
+                        )
+                        progress = st.progress(0, text="Preparing translation quality checks...")
 
                         for position, row_index in enumerate(selected_indices, start=1):
                             qa_row = review_df.loc[row_index]
@@ -2172,8 +2753,14 @@ if "atlas_uploaded_json" in st.session_state:
                                     translation_source=f"{ai_provider} ({ai_model})",
                                 )
                                 qa_completed += 1
+                            except AIServiceError as exc:
+                                qa_failed.append(f"{source_text}: {friendly_ai_message(exc)}")
+                                if exc.kind == "quota":
+                                    qa_quota_stopped = True
+                                    st.session_state["qa_service_notice"] = friendly_ai_message(exc)
+                                    break
                             except Exception as exc:
-                                qa_failed.append(f"{source_text}: {exc}")
+                                qa_failed.append(f"{source_text}: {friendly_ai_message(exc)}")
 
                             progress.progress(
                                 position / max(1, len(selected_indices)),
@@ -2181,6 +2768,7 @@ if "atlas_uploaded_json" in st.session_state:
                             )
 
                         progress.empty()
+                        qa_loader.empty()
                         st.session_state.review_df = review_df
 
                         if qa_failed:
@@ -2196,10 +2784,17 @@ if "atlas_uploaded_json" in st.session_state:
                             set_flash_message("No AI QA checks were completed.", "error")
                         st.rerun()
 
+                qa_service_notice = st.session_state.pop("qa_service_notice", None)
+                if qa_service_notice:
+                    st.warning(qa_service_notice)
+
                 qa_errors = st.session_state.pop("qa_errors", None)
                 if qa_errors:
-                    st.error("Some AI QA requests failed.")
-                    with st.expander("Show QA errors"):
+                    st.info(
+                        "One or more AI quality checks could not be completed. "
+                        "AI QA remains advisory and no approval status was changed automatically."
+                    )
+                    with st.expander("Quality check request details"):
                         for error in qa_errors:
                             st.write(f"- {error}")
 
@@ -2325,7 +2920,7 @@ if "atlas_uploaded_json" in st.session_state:
 
             lc1, lc2, lc3 = st.columns(3)
             lc1.metric("Ready to learn", sum(1 for x in tm_candidates if x["state"] == "New"))
-            lc2.metric("Already in TM", tm_already_stored)
+            lc2.metric("Already in Translation Memory", tm_already_stored)
             lc3.metric("Conflicts", tm_conflicts)
 
             new_candidates = [x for x in tm_candidates if x["state"] == "New"]
@@ -2409,7 +3004,7 @@ if "atlas_uploaded_json" in st.session_state:
             # GENERATE APPROVED OUTPUT
             # =================================================
 
-            st.header("4. Approved Output")
+            st.header("4. Verify & Export")
 
             approved_data, approved_count = apply_approved_translations(
                 data, review_df
@@ -2420,6 +3015,50 @@ if "atlas_uploaded_json" in st.session_state:
                 ensure_ascii=False,
                 indent=2
             )
+
+            # v1.3 integrity gate: compare the approved output against the source
+            # and permit changes only to explicitly approved Section.Label and
+            # Measurement.Name fields.
+            integrity_result = verify_export_integrity(data, approved_data, review_df)
+            integrity_report = make_integrity_report(integrity_result)
+
+            st.subheader("Artifact Integrity")
+            ic1, ic2, ic3 = st.columns(3)
+            ic1.metric("Integrity Result", integrity_result["status"])
+            ic2.metric("Expected Changes", len(integrity_result["expected_changes"]))
+            ic3.metric("Unexpected Changes", len(integrity_result["unexpected_changes"]))
+
+            if integrity_result["status"] == "PASS":
+                st.success(
+                    "Artifact integrity passed. No protected MODA fields were changed."
+                )
+            else:
+                st.error(
+                    "Artifact integrity failed. The translated JSON download is blocked because "
+                    "one or more unexpected JSON changes were detected."
+                )
+                with st.expander("Review unexpected JSON changes", expanded=True):
+                    st.dataframe(
+                        pd.DataFrame(integrity_result["unexpected_changes"]),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+
+            with st.expander("Integrity details", expanded=False):
+                st.code(
+                    f"Source SHA-256: {integrity_result['source_sha256']}\n"
+                    f"Output SHA-256: {integrity_result['output_sha256']}",
+                    language="text",
+                )
+                if integrity_result["expected_changes"]:
+                    st.write("Expected approved translation changes:")
+                    st.dataframe(
+                        pd.DataFrame(integrity_result["expected_changes"]),
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+                else:
+                    st.caption("No approved translation changes are present in the output yet.")
 
             if approved_count == len(review_df):
                 st.success("All extracted translatable items are approved.")
@@ -2442,11 +3081,15 @@ if "atlas_uploaded_json" in st.session_state:
 
             with col1:
                 st.download_button(
-                    label="🗂️ Download Approved JSON",
+                    label="🗂️ Download Translated MODA JSON",
                     data=translated_json_string,
-                    file_name="MODA_Approved_Translated.json",
+                    file_name="MODA_ATLAS_Translated.json",
                     mime="application/json",
                     use_container_width=True,
+                    disabled=integrity_result["status"] != "PASS",
+                    help=(
+                        "Available only when the v1.3 export integrity verification passes."
+                    ),
                 )
 
             with col2:
@@ -2470,6 +3113,14 @@ if "atlas_uploaded_json" in st.session_state:
                     use_container_width=True,
                 )
 
+            st.download_button(
+                label="🛡️ Download Integrity Report",
+                data=integrity_report,
+                file_name="ATLAS_v1.3_Integrity_Report.txt",
+                mime="text/plain",
+                use_container_width=True,
+            )
+
             # ------------------------------------------------
             # APPROVAL GATE
             # ------------------------------------------------
@@ -2488,7 +3139,7 @@ if "atlas_uploaded_json" in st.session_state:
             # JSON PREVIEW
             # =================================================
 
-            st.subheader("Approved JSON Preview")
+            st.subheader("Translated JSON Preview")
             st.info(
                 "The JSON is generated from a copy of the original file. "
                 "Only approved Measurement Name values are changed by this review workflow. "
@@ -2515,3 +3166,17 @@ if "atlas_uploaded_json" in st.session_state:
 
 else:
     st.info("Load a MODA-ES JSON file from the **Current File** section in the sidebar to begin.")
+
+
+# Demo footer
+st.divider()
+st.caption("Prototype demo • AI-generated translations and quality findings are advisory • Human review and approval remain required • Use synthetic/non-confidential data")
+
+# ---------------------------------------------------------
+# DEMO FOOTER
+# ---------------------------------------------------------
+st.divider()
+st.caption(
+    "ATLAS prototype • AI suggestions and quality findings are advisory • "
+    "Human review and approval remain required • Demo with synthetic/non-confidential data"
+)
