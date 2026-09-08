@@ -33,7 +33,7 @@ st.set_page_config(
 # ---------------------------------------------------------
 # DEMO UI / BRANDING
 # ---------------------------------------------------------
-APP_VERSION = "v1.3.6 • Branded UI"
+APP_VERSION = "v1.3.1 • Pilot Application"
 
 st.markdown(
     '''
@@ -109,7 +109,7 @@ else:
 
 st.markdown(
     f'<div class="atlas-hero"><div class="atlas-brand-title">AI-Assisted MES Translation</div>'
-    f'<div class="atlas-brand-subtitle">MODA-ES JSON • English → German • Human-Controlled Review</div>'
+    f'<div class="atlas-brand-subtitle">MES Artifact • English → German • Human-Controlled Review</div>'
     f'<div class="atlas-version-chip">{APP_VERSION} • Controlled translation workflow</div></div>',
     unsafe_allow_html=True,
 )
