@@ -33,7 +33,7 @@ st.set_page_config(
 # ---------------------------------------------------------
 # DEMO UI / BRANDING
 # ---------------------------------------------------------
-APP_VERSION = "v1.3.7 • QA Precision Update"
+APP_VERSION = "v1.3.7 • Pilot App QA Precision Update"
 
 st.markdown(
     '''
