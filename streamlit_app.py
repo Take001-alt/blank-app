@@ -13,177 +13,117 @@ import urllib.error
 from pathlib import Path
 
 # ---------------------------------------------------------
-# PAGE CONFIGURATION
+# PAGE CONFIGURATION / BRAND ASSETS
 # ---------------------------------------------------------
 
+APP_DIR = Path(__file__).resolve().parent if "__file__" in globals() else Path.cwd()
+ASSET_DIR = APP_DIR / "assets"
+ICON_CANDIDATES = [ASSET_DIR / "atlas_icon.png", APP_DIR / "atlas_icon.png", APP_DIR / "Atlas_Icon_withoutbg.png"]
+LOGO_CANDIDATES = [ASSET_DIR / "atlas_logo.png", APP_DIR / "atlas_logo.png", APP_DIR / "ATLAS_Logo-banner.png", APP_DIR / "atlas_logo.jpg", APP_DIR / "atlas_logo.jpeg"]
+ATLAS_ICON = next((path for path in ICON_CANDIDATES if path.exists()), None)
+ATLAS_LOGO = next((path for path in LOGO_CANDIDATES if path.exists()), None)
+
 st.set_page_config(
-    page_title="ATLAS",
-    page_icon="",
-    layout="wide"
+    page_title="ATLAS — AI-Assisted MES Translation",
+    page_icon=str(ATLAS_ICON) if ATLAS_ICON else "🌐",
+    layout="wide",
+    initial_sidebar_state="expanded",
 )
 
 # ---------------------------------------------------------
 # DEMO UI / BRANDING
 # ---------------------------------------------------------
-
-APP_VERSION = "v1.3.1 Demo"
-APP_DIR = Path(__file__).resolve().parent if "__file__" in globals() else Path.cwd()
-LOGO_CANDIDATES = [
-    APP_DIR / "atlas_logo.png",
-    APP_DIR / "atlas_logo.jpg",
-    APP_DIR / "atlas_logo.jpeg",
-]
-ATLAS_LOGO = next((path for path in LOGO_CANDIDATES if path.exists()), None)
+APP_VERSION = "v1.3.6 • Branded UI"
 
 st.markdown(
-    """
+    '''
     <style>
-    @keyframes atlasFadeUp {
-        from { opacity: 0; transform: translateY(8px); }
-        to   { opacity: 1; transform: translateY(0); }
+    :root {
+        --atlas-navy:#062E54; --atlas-navy-2:#0A416F; --atlas-blue:#087FB8;
+        --atlas-cyan:#08C7DF; --atlas-cyan-soft:#E7FAFD; --atlas-ice:#F5FAFD;
+        --atlas-silver:#E7EDF3; --atlas-text:#14324A; --atlas-muted:#65798A;
+        --atlas-radius:14px;
     }
-    @keyframes atlasPulse {
-        0%, 100% { transform: scale(1); opacity: .65; }
-        50% { transform: scale(1.18); opacity: 1; }
-    }
-    @keyframes atlasGlow {
-        0%, 100% { box-shadow: 0 0 0 rgba(49, 130, 206, 0); }
-        50% { box-shadow: 0 0 22px rgba(49, 130, 206, .18); }
-    }
+    @keyframes atlasFadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes atlasPulse { 0%,100%{transform:scale(1);opacity:.55} 50%{transform:scale(1.16);opacity:1} }
 
+    html, body, [class*="css"] { font-family:Inter,"Segoe UI",Arial,sans-serif; }
+    div[data-testid="stAppViewContainer"] {
+        background:radial-gradient(circle at 82% 0%,rgba(8,199,223,.065),transparent 24rem),linear-gradient(180deg,#FFF 0%,#FAFCFE 100%);
+    }
     div[data-testid="stAppViewContainer"] .main .block-container {
-        animation: atlasFadeUp .35s ease-out;
-        padding-top: 1.35rem;
+        animation:atlasFadeUp .28s ease-out; max-width:1500px; padding-top:1rem; padding-bottom:2.5rem;
     }
-    .atlas-brand-row {
-        display: flex;
-        align-items: center;
-        gap: .85rem;
-        margin-bottom: .2rem;
-    }
-    .atlas-logo-mark {
-        width: 48px;
-        height: 48px;
-        border-radius: 14px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.25rem;
-        font-weight: 800;
-        border: 1px solid rgba(120,120,120,.25);
-        background: rgba(120,120,120,.06);
-        animation: atlasGlow 3.2s ease-in-out infinite;
-    }
-    .atlas-brand-title {
-        font-size: 2rem;
-        font-weight: 760;
-        line-height: 1.08;
-        letter-spacing: -.025em;
-    }
-    .atlas-brand-subtitle {
-        opacity: .72;
-        margin-top: .18rem;
-    }
-    .atlas-flow {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: .42rem;
-        margin: .85rem 0 .5rem 0;
-    }
-    .atlas-step {
-        border: 1px solid rgba(120,120,120,.22);
-        border-radius: 999px;
-        padding: .32rem .68rem;
-        font-size: .82rem;
-        font-weight: 650;
-        background: rgba(120,120,120,.045);
-    }
-    .atlas-arrow { opacity: .40; font-size: .78rem; }
+    .atlas-hero { text-align:center; margin:.1rem auto .7rem; max-width:940px; }
+    .atlas-brand-title { color:var(--atlas-navy);font-size:1.72rem;font-weight:780;line-height:1.15;letter-spacing:-.025em;margin-top:.35rem; }
+    .atlas-brand-subtitle { color:var(--atlas-muted);font-size:.95rem;margin-top:.28rem; }
+    .atlas-version-chip { display:inline-flex;align-items:center;gap:.35rem;margin-top:.55rem;padding:.28rem .62rem;border:1px solid rgba(8,127,184,.20);border-radius:999px;color:var(--atlas-navy-2);background:rgba(231,250,253,.7);font-size:.75rem;font-weight:650; }
 
-    .atlas-loader {
-        border: 1px solid rgba(120,120,120,.20);
-        border-radius: 14px;
-        padding: .8rem 1rem;
-        margin: .6rem 0;
-        background: rgba(120,120,120,.035);
-        animation: atlasFadeUp .25s ease-out;
-    }
-    .atlas-loader-title { font-weight: 700; margin-bottom: .35rem; }
-    .atlas-loader-dots { display: inline-flex; gap: 7px; margin-right: .55rem; }
-    .atlas-loader-dots span {
-        width: 8px; height: 8px; border-radius: 50%;
-        background: currentColor;
-        display: inline-block;
-        animation: atlasPulse 1.1s infinite ease-in-out;
-    }
-    .atlas-loader-dots span:nth-child(2) { animation-delay: .14s; }
-    .atlas-loader-dots span:nth-child(3) { animation-delay: .28s; }
+    .atlas-flow { display:flex;justify-content:center;flex-wrap:wrap;align-items:center;gap:.38rem;margin:.85rem auto .55rem; }
+    .atlas-step { border:1px solid rgba(8,127,184,.20);border-radius:999px;padding:.34rem .72rem;font-size:.80rem;font-weight:680;color:var(--atlas-navy);background:rgba(255,255,255,.92);box-shadow:0 2px 10px rgba(6,46,84,.04); }
+    .atlas-step strong { color:var(--atlas-blue); } .atlas-arrow { color:var(--atlas-cyan);opacity:.85;font-size:.78rem; }
 
-    div.stButton > button,
-    div.stDownloadButton > button {
-        transition: transform .14s ease, box-shadow .14s ease, border-color .14s ease;
-    }
-    div.stButton > button:hover,
-    div.stDownloadButton > button:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 5px 16px rgba(0,0,0,.09);
-    }
-    div[role="radiogroup"] label {
-        transition: background-color .16s ease, transform .16s ease;
-        border-radius: 8px;
-    }
-    div[role="radiogroup"] label:hover {
-        transform: translateX(2px);
-        background: rgba(120,120,120,.06);
-    }
-    button[data-baseweb="tab"] {
-        transition: transform .16s ease, opacity .16s ease;
-    }
-    button[data-baseweb="tab"]:hover { transform: translateY(-1px); }
-    div[data-testid="stExpander"] {
-        transition: box-shadow .18s ease, transform .18s ease;
-    }
-    div[data-testid="stExpander"]:hover {
-        box-shadow: 0 4px 18px rgba(0,0,0,.045);
-    }
+    h1,h2,h3 { color:var(--atlas-navy)!important;letter-spacing:-.015em; } h2 { margin-top:1.15rem!important; }
+    hr { border-color:rgba(8,127,184,.12)!important; }
+
+    div[data-testid="stMetric"] { background:rgba(255,255,255,.94);border:1px solid rgba(8,127,184,.12);border-radius:var(--atlas-radius);padding:.72rem .85rem;box-shadow:0 5px 18px rgba(6,46,84,.045);min-height:92px; }
+    div[data-testid="stMetric"] label { color:var(--atlas-muted)!important; }
+    div[data-testid="stMetricValue"] { color:var(--atlas-navy)!important;font-weight:760; }
+
+    div.stButton>button,div.stDownloadButton>button { border-radius:10px!important;border:1px solid rgba(8,127,184,.26)!important;font-weight:650!important;transition:transform .12s ease,box-shadow .12s ease,border-color .12s ease; }
+    div.stButton>button:hover,div.stDownloadButton>button:hover { transform:translateY(-1px);border-color:var(--atlas-cyan)!important;box-shadow:0 5px 16px rgba(6,46,84,.10); }
+    button[kind="primary"] { background:linear-gradient(135deg,var(--atlas-navy-2),var(--atlas-blue))!important;color:white!important;border:none!important; }
+
+    div[data-testid="stExpander"] { border:1px solid rgba(8,127,184,.12)!important;border-radius:var(--atlas-radius)!important;background:rgba(255,255,255,.84);box-shadow:0 3px 14px rgba(6,46,84,.03);overflow:hidden; }
+    div[data-testid="stFileUploader"] section { border-radius:var(--atlas-radius)!important;border-color:rgba(8,127,184,.25)!important;background:var(--atlas-ice)!important; }
+    div[data-baseweb="input"]>div,div[data-baseweb="select"]>div,textarea { border-radius:10px!important; }
+    button[data-baseweb="tab"] { color:var(--atlas-muted)!important;font-weight:650!important; }
+    button[data-baseweb="tab"][aria-selected="true"] { color:var(--atlas-navy)!important; }
+
+    section[data-testid="stSidebar"] { background:linear-gradient(180deg,#F7FBFD 0%,#F1F8FB 100%);border-right:1px solid rgba(8,127,184,.12); }
+    section[data-testid="stSidebar"]>div { padding-top:.75rem; }
+    .atlas-sidebar-brand { text-align:center;padding:.30rem .20rem .55rem; }
+    .atlas-sidebar-name { color:var(--atlas-navy);font-weight:800;letter-spacing:.12em;font-size:.92rem;margin-top:.15rem; }
+    .atlas-sidebar-tagline { color:var(--atlas-muted);font-size:.70rem;margin-top:.12rem; }
+    div[role="radiogroup"] label { border-radius:9px;transition:background-color .14s ease,transform .14s ease;padding:.15rem .20rem; }
+    div[role="radiogroup"] label:hover { transform:translateX(2px);background:rgba(8,199,223,.07); }
+
+    .atlas-loader { border:1px solid rgba(8,127,184,.16);border-radius:var(--atlas-radius);padding:.8rem 1rem;margin:.6rem 0;background:linear-gradient(135deg,rgba(231,250,253,.72),rgba(255,255,255,.95));animation:atlasFadeUp .22s ease-out; }
+    .atlas-loader-title { color:var(--atlas-navy);font-weight:720;margin-bottom:.35rem; }
+    .atlas-loader-dots { display:inline-flex;gap:7px;margin-right:.55rem;color:var(--atlas-cyan); }
+    .atlas-loader-dots span { width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block;animation:atlasPulse 1.1s infinite ease-in-out; }
+    .atlas-loader-dots span:nth-child(2){animation-delay:.14s}.atlas-loader-dots span:nth-child(3){animation-delay:.28s}
+    .atlas-note { border-left:3px solid var(--atlas-cyan);background:var(--atlas-cyan-soft);color:var(--atlas-text);border-radius:0 10px 10px 0;padding:.58rem .78rem;margin:.45rem 0 .65rem;font-size:.84rem; }
+    @media(max-width:900px){.atlas-brand-title{font-size:1.42rem}.atlas-step{font-size:.74rem;padding:.28rem .55rem}}
     </style>
-    """,
+    ''',
     unsafe_allow_html=True,
 )
 
 if ATLAS_LOGO:
-    h1, h2 = st.columns([0.075, 0.925], vertical_alignment="center")
-    with h1:
+    logo_left, logo_mid, logo_right = st.columns([1.0, 1.15, 1.0], vertical_alignment="center")
+    with logo_mid:
         st.image(str(ATLAS_LOGO), use_container_width=True)
-    with h2:
-        st.markdown(
-            '<div class="atlas-brand-title">ATLAS — AI-Assisted MES Translation</div>'
-            '<div class="atlas-brand-subtitle">MODA-ES JSON • English → German • Human-Controlled Review</div>',
-            unsafe_allow_html=True,
-        )
 else:
-    st.markdown(
-        '<div class="atlas-brand-row">'
-        '<div class="atlas-logo-mark">A</div>'
-        '<div><div class="atlas-brand-title">ATLAS — AI-Assisted MES Translation</div>'
-        '<div class="atlas-brand-subtitle">MODA-ES JSON • English → German • Human-Controlled Review</div></div>'
-        '</div>',
-        unsafe_allow_html=True,
-    )
+    st.markdown('<div class="atlas-hero"><div class="atlas-brand-title">ATLAS — AI-Assisted MES Translation</div></div>', unsafe_allow_html=True)
 
 st.markdown(
-    '<div class="atlas-flow">'
-    '<span class="atlas-step">1 Import</span><span class="atlas-arrow">→</span>'
-    '<span class="atlas-step">2 Translate</span><span class="atlas-arrow">→</span>'
-    '<span class="atlas-step">3 Review</span><span class="atlas-arrow">→</span>'
-    '<span class="atlas-step">4 Quality Check</span><span class="atlas-arrow">→</span>'
-    '<span class="atlas-step">5 Verify</span><span class="atlas-arrow">→</span>'
-    '<span class="atlas-step">6 Export</span>'
-    '</div>',
+    f'<div class="atlas-hero"><div class="atlas-brand-title">AI-Assisted MES Translation</div>'
+    f'<div class="atlas-brand-subtitle">MODA-ES JSON • English → German • Human-Controlled Review</div>'
+    f'<div class="atlas-version-chip">{APP_VERSION} • Controlled translation workflow</div></div>',
     unsafe_allow_html=True,
 )
-st.caption(f"{APP_VERSION} • Demo workflow — existing translation → controlled knowledge → AI assistance → human approval")
+st.markdown(
+    '<div class="atlas-flow">'
+    '<span class="atlas-step"><strong>1</strong>&nbsp; Import</span><span class="atlas-arrow">→</span>'
+    '<span class="atlas-step"><strong>2</strong>&nbsp; Translate</span><span class="atlas-arrow">→</span>'
+    '<span class="atlas-step"><strong>3</strong>&nbsp; Review</span><span class="atlas-arrow">→</span>'
+    '<span class="atlas-step"><strong>4</strong>&nbsp; Quality Check</span><span class="atlas-arrow">→</span>'
+    '<span class="atlas-step"><strong>5</strong>&nbsp; Verify</span><span class="atlas-arrow">→</span>'
+    '<span class="atlas-step"><strong>6</strong>&nbsp; Export</span>'
+    '</div>', unsafe_allow_html=True,
+)
+st.markdown('<div class="atlas-note"><strong>Workflow principle:</strong> existing artifact translation → Translation Memory → controlled terminology → AI assistance → human approval → integrity verification.</div>', unsafe_allow_html=True)
 st.divider()
 
 
@@ -1006,14 +946,19 @@ def make_audit_excel(df):
 # ============================================================
 
 with st.sidebar:
-    if ATLAS_LOGO:
-        st.image(str(ATLAS_LOGO), width=88)
-    else:
-        st.markdown(
-            '<div style="font-size:1.35rem;font-weight:800;letter-spacing:-.02em;">ATLAS</div>'
-            '<div style="opacity:.62;font-size:.78rem;margin-bottom:.4rem;">AI-Assisted MES Translation</div>',
-            unsafe_allow_html=True,
-        )
+    st.markdown('<div class="atlas-sidebar-brand">', unsafe_allow_html=True)
+    if ATLAS_ICON:
+        icon_left, icon_mid, icon_right = st.columns([1, 1.15, 1])
+        with icon_mid:
+            st.image(str(ATLAS_ICON), use_container_width=True)
+    elif ATLAS_LOGO:
+        st.image(str(ATLAS_LOGO), use_container_width=True)
+    st.markdown(
+        '<div class="atlas-sidebar-name">ATLAS</div>'
+        '<div class="atlas-sidebar-tagline">AI-ASSISTED MES TRANSLATION</div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
 
     page = st.radio(
         "ATLAS Module",
@@ -2433,6 +2378,85 @@ if "atlas_uploaded_json" in st.session_state:
                 lambda value: "🔵 AI" if value.startswith("AI Suggested -") else ""
             )
 
+            st.markdown("#### Find a translation to review")
+            search_col, filter_col = st.columns([0.72, 0.28])
+            with search_col:
+                review_search = st.text_input(
+                    "Search review table",
+                    key="atlas_review_search",
+                    placeholder="Search source, translation, section, status, or QA result...",
+                    label_visibility="collapsed",
+                    help=(
+                        "Filter the main review table without changing the underlying review data. "
+                        "Useful when an AI Quality Check identifies a specific item that needs attention."
+                    ),
+                )
+            with filter_col:
+                review_scope = st.selectbox(
+                    "Filter",
+                    [
+                        "All items",
+                        "AI translations",
+                        "Needs Review",
+                        "Approved",
+                        "Rejected",
+                        "QA Warning / Review Required",
+                    ],
+                    key="atlas_review_scope",
+                    label_visibility="collapsed",
+                )
+
+            # Preserve original review_df row identity while presenting only matching rows.
+            # This prevents filtered table edits from being written back to the wrong item.
+            visible_mask = pd.Series(True, index=review_df.index)
+
+            if review_scope == "AI translations":
+                visible_mask &= review_df["Proposal Source"].astype(str).str.startswith("AI Suggested -")
+            elif review_scope == "Needs Review":
+                visible_mask &= review_df["Status"].astype(str).eq("Needs Review")
+            elif review_scope == "Approved":
+                visible_mask &= review_df["Status"].astype(str).eq("Approved")
+            elif review_scope == "Rejected":
+                visible_mask &= review_df["Status"].astype(str).eq("Rejected")
+            elif review_scope == "QA Warning / Review Required":
+                visible_mask &= review_df["QA Result"].astype(str).isin(["Warning", "Review Required"])
+
+            if review_search.strip():
+                query = review_search.strip()
+                search_columns = [
+                    "Item Type",
+                    "Section",
+                    "English Source",
+                    "Existing Translation",
+                    "Translation",
+                    "Proposal Source",
+                    "Terminology Matches",
+                    "Status",
+                    "QA Result",
+                    "QA Notes",
+                ]
+                search_mask = pd.Series(False, index=review_df.index)
+                for col_name in search_columns:
+                    if col_name in review_df.columns:
+                        search_mask |= review_df[col_name].astype(str).str.contains(
+                            query,
+                            case=False,
+                            na=False,
+                            regex=False,
+                        )
+                visible_mask &= search_mask
+
+            visible_indices = review_df.index[visible_mask].tolist()
+
+            if review_search.strip() or review_scope != "All items":
+                if visible_indices:
+                    st.caption(
+                        f"Showing **{len(visible_indices)}** of **{len(review_df)}** review items. "
+                        "Clear the search/filter to return to the full table."
+                    )
+                else:
+                    st.info("No review items match the current search/filter.")
+
             editable_columns = [
                 "AI Translation",
                 "ID",
@@ -2454,7 +2478,8 @@ if "atlas_uploaded_json" in st.session_state:
             # Whole-row AI highlighting requires an editable grid that supports row styling.
             # AgGrid keeps Translation and Review Status editable while allowing AI-generated
             # rows to be highlighted across the full width of the table.
-            grid_df = review_df[editable_columns].copy()
+            grid_df = review_df.loc[visible_indices, editable_columns].copy()
+            grid_df["_review_index"] = visible_indices
 
             gb = GridOptionsBuilder.from_dataframe(grid_df)
             gb.configure_default_column(
@@ -2492,6 +2517,11 @@ if "atlas_uploaded_json" in st.session_state:
                     "values": ["Pending", "Needs Review", "Approved", "Rejected"]
                 },
                 minWidth=145,
+            )
+            gb.configure_column(
+                "_review_index",
+                hide=True,
+                editable=False,
             )
             gb.configure_column("AI Translation", header_name="AI", width=85, pinned="left")
             gb.configure_column("ID", header_name="#", width=70)
@@ -2536,14 +2566,17 @@ if "atlas_uploaded_json" in st.session_state:
                 update_mode=GridUpdateMode.VALUE_CHANGED,
                 allow_unsafe_jscode=True,
                 fit_columns_on_grid_load=False,
-                height=540,
+                height=220 if not visible_indices else 540,
                 theme="streamlit",
-                key=f"translation_editor_grid_{st.session_state.get('translation_grid_revision', 0)}",
+                key=(
+                    f"translation_editor_grid_{st.session_state.get('translation_grid_revision', 0)}_"
+                    f"{hashlib.sha256((review_search + '|' + review_scope).encode('utf-8')).hexdigest()[:10]}"
+                ),
             )
 
             edited_df = grid_response["data"].copy()
-            # Preserve expected column order/types for the existing audit/update logic below.
-            edited_df = edited_df[editable_columns]
+            # Keep the stable original review index so filtered edits map back to the correct row.
+            edited_df = edited_df[editable_columns + ["_review_index"]]
             with st.expander("Show technical details", expanded=False):
                 st.caption(
                     "Technical metadata is kept available for developers, validators, and troubleshooting, "
@@ -2575,44 +2608,56 @@ if "atlas_uploaded_json" in st.session_state:
                 ]
                 st.dataframe(technical_df, use_container_width=True, hide_index=True)
 
-            # Persist edits from the data editor and record meaningful review changes.
-            previous_translations = review_df["Translation"].astype(str).tolist()
-            previous_statuses = review_df["Status"].astype(str).tolist()
-            new_translations = edited_df["Translation"].astype(str).tolist()
-            new_statuses = edited_df["Status"].astype(str).tolist()
+            # Persist only the rows currently visible in the filtered grid.
+            # Stable _review_index values ensure edits always map back to the correct source item.
+            for _, edited_row in edited_df.iterrows():
+                try:
+                    row_index = int(edited_row["_review_index"])
+                except (TypeError, ValueError):
+                    continue
 
-            for row_pos in range(len(review_df)):
-                audit_row = review_df.iloc[row_pos]
-                if previous_translations[row_pos] != new_translations[row_pos]:
+                if row_index not in review_df.index:
+                    continue
+
+                audit_row = review_df.loc[row_index]
+                previous_translation = str(audit_row["Translation"])
+                previous_status = str(audit_row["Status"])
+                new_translation = str(edited_row["Translation"])
+                new_status = str(edited_row["Status"])
+
+                if previous_translation != new_translation:
                     record_audit_event(
                         "Review Translation Edited",
                         english_source=audit_row["English Source"],
-                        previous_translation=previous_translations[row_pos],
-                        new_translation=new_translations[row_pos],
-                        review_status=new_statuses[row_pos],
+                        previous_translation=previous_translation,
+                        new_translation=new_translation,
+                        review_status=new_status,
                         source_file=current_file_name,
-                        reason="Translation edited in review workspace",
+                        reason="Translation edited in filtered review workspace",
                         translation_source=audit_row.get("Proposal Source", ""),
                     )
-                if previous_statuses[row_pos] != new_statuses[row_pos]:
+
+                if previous_status != new_status:
                     action = "Review Status Changed"
-                    if new_statuses[row_pos] == "Approved":
+                    if new_status == "Approved":
                         action = "Review Approved"
-                    elif new_statuses[row_pos] == "Rejected":
+                    elif new_status == "Rejected":
                         action = "Review Rejected"
+
                     record_audit_event(
                         action,
                         english_source=audit_row["English Source"],
                         previous_translation=audit_row["Existing Translation"],
-                        new_translation=new_translations[row_pos],
-                        review_status=new_statuses[row_pos],
+                        new_translation=new_translation,
+                        review_status=new_status,
                         source_file=current_file_name,
-                        reason=f"Review status changed from {previous_statuses[row_pos]} to {new_statuses[row_pos]}",
+                        reason=f"Review status changed from {previous_status} to {new_status}",
                         translation_source=audit_row.get("Proposal Source", ""),
                     )
 
-            review_df.loc[:, "Translation"] = edited_df["Translation"].values
-            review_df.loc[:, "Status"] = edited_df["Status"].values
+                review_df.at[row_index, "Translation"] = new_translation
+                review_df.at[row_index, "Status"] = new_status
+
             st.session_state.review_df = review_df
 
             # ------------------------------------------------
