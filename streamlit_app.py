@@ -33,7 +33,7 @@ st.set_page_config(
 # ---------------------------------------------------------
 # DEMO UI / BRANDING
 # ---------------------------------------------------------
-APP_VERSION = "v1.3.7 • Pilot App QA Precision Update"
+APP_VERSION = "v1.3.1 • Pilot Application"
 
 st.markdown(
     '''
@@ -734,49 +734,9 @@ def _normalize_qa_result(payload):
         "QA Terminology": check_value("terminology_compliance"),
         "QA Omission": check_value("omission_or_addition"),
         "QA Untranslated": check_value("untranslated_text"),
-        "QA Target Language": check_value("target_language_validity"),
         "QA Ambiguity": check_value("ambiguity"),
         "QA Notes": str(payload.get("notes", "")).strip(),
     }
-
-
-def _apply_qa_guardrails(qa_result, source_text, translation, terminology_matches):
-    """Apply deterministic ATLAS QA rules around the advisory AI result.
-
-    These rules improve classification consistency without approving or rewriting
-    translation content. Human Review Status remains unchanged.
-    """
-    result = dict(qa_result or {})
-    source = str(source_text or "").strip()
-    target = str(translation or "").strip()
-    notes = []
-
-    # Terminology compliance is not applicable when no controlled term applies.
-    if not terminology_matches:
-        result["QA Terminology"] = "Not Applicable"
-
-    # Exact source reuse is a deterministic untranslated-text finding.
-    if source and target and source.casefold() == target.casefold():
-        result["QA Untranslated"] = "Fail"
-        result["QA Meaning"] = "Fail"
-        notes.append("ATLAS deterministic check: target text is identical to the English source.")
-
-    # Ensure material check failures cannot coexist with an overall Pass/Warning.
-    check_fields = [
-        "QA Meaning", "QA Terminology", "QA Omission", "QA Untranslated",
-        "QA Target Language", "QA Ambiguity",
-    ]
-    values = [str(result.get(field, "")) for field in check_fields]
-    if "Fail" in values:
-        result["QA Result"] = "Review Required"
-    elif "Warning" in values and result.get("QA Result") == "Pass":
-        result["QA Result"] = "Warning"
-
-    ai_notes = str(result.get("QA Notes", "")).strip()
-    if notes:
-        result["QA Notes"] = " ".join([x for x in [ai_notes, *notes] if x]).strip()
-
-    return result
 
 
 def call_gemini_quality_check(
@@ -804,10 +764,7 @@ def call_gemini_quality_check(
         "translation workflow. Compare the English source with the German translation. "
         "Do NOT rewrite or approve the translation. Assess only translation quality. "
         "Pay special attention to meaning preservation, missing or added information, "
-        "approved terminology, untranslated source text, target-language validity, and ambiguity. "
-        "Target-language validity means the target must be intelligible, grammatically plausible German "
-        "for the MES context; gibberish, corrupted strings, or text in the wrong language must fail. "
-        "If no approved terminology is supplied, terminology_compliance must be Not Applicable. "
+        "approved terminology, untranslated source text, and ambiguity. "
         "Return ONLY valid JSON and no markdown."
     )
 
@@ -831,7 +788,6 @@ Return exactly one JSON object with these keys:
   "terminology_compliance": "Pass | Warning | Fail | Not Applicable",
   "omission_or_addition": "Pass | Warning | Fail | Not Applicable",
   "untranslated_text": "Pass | Warning | Fail | Not Applicable",
-  "target_language_validity": "Pass | Warning | Fail | Not Applicable",
   "ambiguity": "Pass | Warning | Fail | Not Applicable",
   "notes": "brief reviewer-focused explanation"
 }}
@@ -839,9 +795,6 @@ Return exactly one JSON object with these keys:
 Use "Pass" only when no material issue is detected.
 Use "Warning" when the translation may be acceptable but deserves attention.
 Use "Review Required" when one or more material issues may affect correctness.
-For terminology_compliance, return "Not Applicable" when no approved terminology applies.
-For untranslated_text, assess whether meaningful English source text remains untranslated; gibberish is not an untranslated-text pass/fail substitute.
-For target_language_validity, return "Fail" for gibberish, corrupted text, clearly wrong-language output, or German that is not intelligible enough for an MES reviewer.
 """
 
     body = json.dumps({
@@ -883,13 +836,7 @@ For target_language_validity, return "Fail" for gibberish, corrupted text, clear
     if not raw_text:
         raise RuntimeError("Gemini QA returned no result.")
 
-    normalized = _normalize_qa_result(_parse_json_object_from_text(raw_text))
-    return _apply_qa_guardrails(
-        normalized,
-        source_text=source_text,
-        translation=translation,
-        terminology_matches=terminology_matches,
-    )
+    return _normalize_qa_result(_parse_json_object_from_text(raw_text))
 
 
 def generate_ai_quality_check(
@@ -1777,7 +1724,6 @@ def build_review_dataframe(original_data):
                 "QA Terminology": "",
                 "QA Omission": "",
                 "QA Untranslated": "",
-                "QA Target Language": "",
                 "QA Ambiguity": "",
                 "QA Notes": "",
                 "QA Checked Translation": "",
@@ -1818,7 +1764,6 @@ def build_review_dataframe(original_data):
                 "QA Terminology": "",
                 "QA Omission": "",
                 "QA Untranslated": "",
-                "QA Target Language": "",
                 "QA Ambiguity": "",
                 "QA Notes": "",
                 "QA Checked Translation": "",
@@ -2067,7 +2012,6 @@ def make_excel(review_df):
             "QA Terminology",
             "QA Omission",
             "QA Untranslated",
-            "QA Target Language",
             "QA Ambiguity",
             "QA Notes",
         ]
@@ -2089,7 +2033,6 @@ def make_excel(review_df):
         "Terminology Compliance",
         "Omission / Addition",
         "Untranslated Text",
-        "Target Language Validity",
         "Ambiguity",
         "AI QA Notes",
     ]
@@ -2134,11 +2077,6 @@ if "atlas_uploaded_json" in st.session_state:
             st.session_state.pop("translation_editor", None)
 
         review_df = st.session_state.review_df
-
-        # Backward-compatible session migration for QA fields introduced after v1.3.6.
-        if "QA Target Language" not in review_df.columns:
-            review_df["QA Target Language"] = ""
-            st.session_state.review_df = review_df
 
         if st.session_state.pop("atlas_new_file_loaded", False):
             set_flash_message(f"Loaded {current_file_name} into the ATLAS session.", "success")
@@ -2544,12 +2482,15 @@ if "atlas_uploaded_json" in st.session_state:
             grid_df["_review_index"] = visible_indices
 
             gb = GridOptionsBuilder.from_dataframe(grid_df)
+            # Keep the review table compact and readable on first load.
+            # Global wrapText/autoHeight previously caused narrow columns (especially
+            # Type and Approved Terms Found) to expand each row vertically.
             gb.configure_default_column(
                 resizable=True,
                 sortable=True,
                 filter=True,
-                wrapText=True,
-                autoHeight=True,
+                wrapText=False,
+                autoHeight=False,
             )
 
             # Read-only reviewer context columns.
@@ -2565,33 +2506,39 @@ if "atlas_uploaded_json" in st.session_state:
                 gb.configure_column(col_name, editable=False)
 
             gb.configure_column(
-                "Translation",
-                header_name="Translation",
-                editable=True,
-                minWidth=260,
-            )
-            gb.configure_column(
-                "Status",
-                header_name="Review Status",
-                editable=True,
-                cellEditor="agSelectCellEditor",
-                cellEditorParams={
-                    "values": ["Pending", "Needs Review", "Approved", "Rejected"]
-                },
-                minWidth=145,
-            )
-            gb.configure_column(
                 "_review_index",
                 hide=True,
                 editable=False,
             )
-            gb.configure_column("AI Translation", header_name="AI", width=85, pinned="left")
-            gb.configure_column("ID", header_name="#", width=70)
-            gb.configure_column("Item Type", header_name="Type", width=120)
-            gb.configure_column("Section", header_name="Context", minWidth=220)
-            gb.configure_column("English Source", header_name="Source Text", minWidth=260)
-            gb.configure_column("Existing Translation", header_name="Current Translation", minWidth=240)
-            gb.configure_column("Terminology Matches", header_name="Approved Terms Found", minWidth=190)
+            gb.configure_column("AI Translation", header_name="AI", width=78, pinned="left", wrapText=False)
+            gb.configure_column("ID", header_name="#", width=64, wrapText=False)
+            gb.configure_column("Item Type", header_name="Type", width=125, minWidth=125, wrapText=False)
+            gb.configure_column(
+                "Section", header_name="Context", minWidth=200, flex=1,
+                wrapText=False, tooltipField="Section"
+            )
+            gb.configure_column(
+                "English Source", header_name="Source Text", minWidth=240, flex=1.4,
+                wrapText=False, tooltipField="English Source"
+            )
+            gb.configure_column(
+                "Existing Translation", header_name="Current Translation", minWidth=220, flex=1.2,
+                wrapText=False, tooltipField="Existing Translation"
+            )
+            gb.configure_column(
+                "Translation", header_name="Translation", editable=True, minWidth=240, flex=1.4,
+                wrapText=False, tooltipField="Translation"
+            )
+            gb.configure_column(
+                "Terminology Matches", header_name="Approved Terms Found", minWidth=210, flex=1.1,
+                wrapText=False, tooltipField="Terminology Matches"
+            )
+            gb.configure_column(
+                "Status", header_name="Review Status", editable=True,
+                cellEditor="agSelectCellEditor",
+                cellEditorParams={"values": ["Pending", "Needs Review", "Approved", "Rejected"]},
+                width=150, minWidth=150, wrapText=False
+            )
 
             # Highlight the ENTIRE row when ATLAS AI generated the current proposal.
             # A darker blue is used for selected rows so the row remains visibly selected.
@@ -2615,6 +2562,8 @@ if "atlas_uploaded_json" in st.session_state:
                 rowSelection="single",
                 suppressRowClickSelection=False,
                 animateRows=True,
+                rowHeight=42,
+                headerHeight=42,
             )
 
             st.caption(
@@ -2738,7 +2687,6 @@ if "atlas_uploaded_json" in st.session_state:
                         review_df.at[row_index, "QA Terminology"] = ""
                         review_df.at[row_index, "QA Omission"] = ""
                         review_df.at[row_index, "QA Untranslated"] = ""
-                        review_df.at[row_index, "QA Target Language"] = ""
                         review_df.at[row_index, "QA Ambiguity"] = ""
                         review_df.at[row_index, "QA Notes"] = (
                             "Translation changed after the previous AI QA check. Run QA again."
@@ -2748,7 +2696,7 @@ if "atlas_uploaded_json" in st.session_state:
             with st.expander("Translation Quality Check", expanded=False):
                 st.write(
                     "AI-assisted quality review compares the source and current translation for meaning preservation, "
-                    "controlled terminology, omissions/additions, untranslated text, target-language validity, and ambiguity. "
+                    "controlled terminology, omissions/additions, untranslated text, and ambiguity. "
                     "It is advisory only and never changes Review Status or approves content."
                 )
 
@@ -2821,7 +2769,7 @@ if "atlas_uploaded_json" in st.session_state:
                         qa_loader = atlas_loading_card(
                             "ATLAS AI is checking translation quality",
                             "Reviewing meaning preservation, terminology, omissions/additions, "
-                            "untranslated text, target-language validity, and ambiguity.",
+                            "untranslated text, and ambiguity.",
                         )
                         progress = st.progress(0, text="Preparing translation quality checks...")
 
@@ -2917,7 +2865,6 @@ if "atlas_uploaded_json" in st.session_state:
                         "QA Terminology",
                         "QA Omission",
                         "QA Untranslated",
-                        "QA Target Language",
                         "QA Ambiguity",
                         "QA Notes",
                     ]
@@ -2933,7 +2880,6 @@ if "atlas_uploaded_json" in st.session_state:
                     "Terminology",
                     "Omission / Addition",
                     "Untranslated Text",
-                    "Target Language",
                     "Ambiguity",
                     "QA Notes",
                 ]
