@@ -1577,11 +1577,7 @@ if page == "Terminology Manager":
 # FILE UPLOAD
 # ============================================================
 
-st.info(
-    #"ATLAS translation hierarchy: Existing translation → Exact Translation Memory phrase → "
-    #"Strict controlled-terminology proposal → Human review. ATLAS only builds a terminology-assisted proposal "
-    #"when approved terminology fully covers the source text; otherwise the item remains Needs Review."
-)
+# Translation hierarchy note removed from the UI.
 
 st.header("1. Import MODA-ES JSON")
 
