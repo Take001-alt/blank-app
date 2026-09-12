@@ -33,7 +33,7 @@ st.set_page_config(
 # ---------------------------------------------------------
 # DEMO UI / BRANDING
 # ---------------------------------------------------------
-APP_VERSION = "v1.3.1 • Pilot Application"
+APP_VERSION = "v1.3.9 • Prototype Application"
 
 st.markdown(
     '''
@@ -1297,6 +1297,74 @@ if page == "Translation Memory":
             st.rerun()
 
     st.divider()
+    st.subheader("Remove translation")
+    st.caption(
+        "Remove an obsolete or incorrect approved phrase from Translation Memory. "
+        "Deletion requires a reason and explicit confirmation, and the action is recorded in the audit trail."
+    )
+
+    if memory:
+        tm_delete_sources = sorted(memory.keys(), key=lambda value: value.casefold())
+        tm_delete_source = st.selectbox(
+            "Translation to remove",
+            tm_delete_sources,
+            format_func=lambda source: f"{source} → {memory.get(source, '')}",
+            key="tm_delete_source",
+            help="Select the approved Translation Memory entry that should no longer be reused.",
+        )
+        tm_delete_target = memory.get(tm_delete_source, "")
+        st.text_input(
+            "Current approved translation",
+            value=tm_delete_target,
+            disabled=True,
+            key="tm_delete_target_preview",
+        )
+        tm_delete_reason = st.text_input(
+            "Reason for deletion",
+            key="tm_delete_reason",
+            placeholder="Required, e.g. obsolete wording, incorrect translation, duplicate entry",
+        )
+        tm_delete_confirm = st.checkbox(
+            "I confirm that this Translation Memory entry should be removed.",
+            key="tm_delete_confirm",
+        )
+
+        if st.button(
+            "Delete Translation Memory Entry",
+            use_container_width=True,
+            type="secondary",
+            disabled=not tm_delete_confirm,
+        ):
+            if not tm_delete_reason.strip():
+                set_flash_message("A reason for deletion is required.", "error")
+                st.rerun()
+
+            # Capture the approved value before deletion so the audit trail preserves
+            # exactly what was removed.
+            previous_target = memory.get(tm_delete_source, "")
+            remove_from_translation_memory(tm_delete_source)
+            record_audit_event(
+                "Translation Deleted",
+                english_source=tm_delete_source,
+                previous_translation=previous_target,
+                new_translation="",
+                review_status="Removed",
+                reason=tm_delete_reason.strip(),
+                translation_source="Translation Memory",
+            )
+            # Clear the delete controls so a rerun cannot accidentally repeat the action.
+            st.session_state.pop("tm_delete_reason", None)
+            st.session_state.pop("tm_delete_confirm", None)
+            st.session_state.pop("tm_delete_target_preview", None)
+            set_flash_message(
+                f"Translation Memory entry removed: {tm_delete_source} → {previous_target}",
+                "warning",
+            )
+            st.rerun()
+    else:
+        st.info("There are no Translation Memory entries available to remove.")
+
+    st.divider()
     st.subheader("Export / Import")
     c1, c2 = st.columns(2)
     with c1:
@@ -1510,9 +1578,9 @@ if page == "Terminology Manager":
 # ============================================================
 
 st.info(
-    "ATLAS translation hierarchy: Existing translation → Exact Translation Memory phrase → "
-    "Strict controlled-terminology proposal → Human review. ATLAS only builds a terminology-assisted proposal "
-    "when approved terminology fully covers the source text; otherwise the item remains Needs Review."
+    #"ATLAS translation hierarchy: Existing translation → Exact Translation Memory phrase → "
+    #"Strict controlled-terminology proposal → Human review. ATLAS only builds a terminology-assisted proposal "
+    #"when approved terminology fully covers the source text; otherwise the item remains Needs Review."
 )
 
 st.header("1. Import MODA-ES JSON")
@@ -1521,7 +1589,7 @@ if "atlas_uploaded_json" in st.session_state:
     current_file_name = st.session_state.get("atlas_uploaded_file_name", "Loaded JSON")
     st.success(f"Working file: {current_file_name}")
     st.caption(
-        "This artifact is stored in the current ATLAS session. You can switch between "
+        #"This artifact is stored in the current ATLAS session. You can switch between "
         "Translation Workspace, Translation Memory, Terminology Manager, and Audit Trail "
         "without uploading it again."
     )
@@ -2093,7 +2161,7 @@ if "atlas_uploaded_json" in st.session_state:
         ds2.metric("Translatable Items", len(review_df))
         ds3.metric("Approved", approved_now)
         ds4.metric("Needs Attention", unresolved_now)
-        st.caption("Workflow: Import → Translate → Review → Quality Check → Verify → Export")
+        #st.caption("Workflow: Import → Translate → Review → Quality Check → Verify → Export")
 
         st.header("2. Artifact Overview")
         section_review_count = int((review_df["_item_type"] == "Section Label").sum()) if not review_df.empty else 0
@@ -2567,8 +2635,8 @@ if "atlas_uploaded_json" in st.session_state:
             )
 
             st.caption(
-                "Rows highlighted in **blue** were generated by ATLAS AI assistance. "
-                "They still require human review before approval."
+                #"Rows highlighted in **blue** were generated by ATLAS AI assistance. "
+                #"They still require human review before approval."
             )
 
             grid_response = AgGrid(
@@ -2695,9 +2763,9 @@ if "atlas_uploaded_json" in st.session_state:
 
             with st.expander("Translation Quality Check", expanded=False):
                 st.write(
-                    "AI-assisted quality review compares the source and current translation for meaning preservation, "
-                    "controlled terminology, omissions/additions, untranslated text, and ambiguity. "
-                    "It is advisory only and never changes Review Status or approves content."
+                    #"AI-assisted quality review compares the source and current translation for meaning preservation, "
+                    #"controlled terminology, omissions/additions, untranslated text, and ambiguity. "
+                    #"It is advisory only and never changes Review Status or approves content."
                 )
 
                 qa_eligible_mask = (
@@ -3225,8 +3293,8 @@ else:
 
 
 # Demo footer
-st.divider()
-st.caption("Prototype demo • AI-generated translations and quality findings are advisory • Human review and approval remain required • Use synthetic/non-confidential data")
+#st.divider()
+#st.caption("Prototype demo • AI-generated translations and quality findings are advisory • Human review and approval remain required • Use synthetic/non-confidential data")
 
 # ---------------------------------------------------------
 # DEMO FOOTER
